@@ -13,10 +13,11 @@ let scene = null;
 let camera = null;
 let renderer = null;
 let anchors = [];
-let models = []; // [左モデル, 右モデル]
-let mixers = []; // [左ミキサー, 右ミキサー]
-let animations = []; // [[左アニメ], [右アニメ]]
-let currentAnimations = [null, null]; // 現在再生中のアニメーション
+let models = []; // [モデル]
+let mixers = []; // [ミキサー]
+let animations = []; // [[アニメ]]
+let currentAnimations = [null]; // 現在再生中のアニメーション
+let clock = null;
 
 // アニメーション名のキーワード（探索用）
 const ANIM_KEYWORDS = {
@@ -27,15 +28,8 @@ const ANIM_KEYWORDS = {
 
 // モデルの配置設定
 const MODEL_CONFIG = {
-    // 左側のモデル
-    left: {
-        position: { x: -0.15, y: 0, z: 0 }, // 名刺の左側に配置（単位: メートル）
-        scale: 0.8, // スケール調整（名刺サイズに合わせて調整）
-        rotation: { x: 0, y: 0, z: 0 } // 回転（必要に応じて調整）
-    },
-    // 右側のモデル
-    right: {
-        position: { x: 0.15, y: 0, z: 0 }, // 名刺の右側に配置
+    single: {
+        position: { x: 0, y: 0, z: 0 }, // 名刺の中央に配置（単位: メートル）
         scale: 0.8,
         rotation: { x: 0, y: 0, z: 0 }
     }
@@ -61,6 +55,7 @@ async function init() {
         renderer = r;
         scene = s;
         camera = c;
+        clock = new THREE.Clock();
 
         // レンダラーの設定
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -143,17 +138,11 @@ async function loadModel(anchor) {
                 // 元のモデル（スケルトン情報を保持）
                 const originalModel = gltf.scene;
 
-                // 左側のモデルを作成
-                const leftModel = skeletonClone(originalModel);
-                setupModel(leftModel, MODEL_CONFIG.left, 0, gltf.animations);
-                anchor.group.add(leftModel);
-                models.push(leftModel);
-
-                // 右側のモデルを作成
-                const rightModel = skeletonClone(originalModel);
-                setupModel(rightModel, MODEL_CONFIG.right, 1, gltf.animations);
-                anchor.group.add(rightModel);
-                models.push(rightModel);
+                // モデルを作成（1体のみ）
+                const singleModel = skeletonClone(originalModel);
+                setupModel(singleModel, MODEL_CONFIG.single, 0, gltf.animations);
+                anchor.group.add(singleModel);
+                models.push(singleModel);
 
                 // ターゲット認識/見失いのイベント設定
                 anchor.onTargetFound = () => {
@@ -297,37 +286,32 @@ function playAnimation(modelIndex, animType, fadeIn = true) {
 // ターゲット認識時の処理
 // ============================================
 function onTargetFound() {
-    // シーケンス再生: 右→wave、左→bow
-    // 少し遅延を入れて順番に再生（見栄えを良くする）
-    setTimeout(() => {
-        playAnimation(1, 'wave', true); // 右側（インデックス1）: wave
-    }, 0);
-    
-    setTimeout(() => {
-        playAnimation(0, 'bow', true); // 左側（インデックス0）: bow
-    }, 500); // 0.5秒後に左側を再生
+    // 認識時にWaveアニメーションがあれば再生、なければidle
+    const hasWave = animations[0]?.some(anim => anim.type === 'wave');
+    playAnimation(0, hasWave ? 'wave' : 'idle', true);
 }
 
 // ============================================
 // ターゲット見失い時の処理
 // ============================================
 function onTargetLost() {
-    // 両方のモデルをidleに戻す
+    // モデルをidleに戻す
     playAnimation(0, 'idle', true);
-    playAnimation(1, 'idle', true);
 }
 
 // ============================================
 // アニメーション更新（毎フレーム呼び出し）
 // ============================================
 function updateAnimations() {
-    if (mindarThree) {
-        const delta = mindarThree.delta;
-        // 各ミキサーを更新
-        mixers.forEach(mixer => {
-            mixer.update(delta);
-        });
+    if (!clock) {
+        return;
     }
+
+    const delta = clock.getDelta();
+    // 各ミキサーを更新
+    mixers.forEach(mixer => {
+        mixer.update(delta);
+    });
 }
 
 // ============================================
@@ -341,7 +325,7 @@ function setupEventListeners() {
 
     // 右側ボタン: Bow
     document.getElementById('btnRightBow').addEventListener('click', () => {
-        playAnimation(1, 'bow', true);
+        playAnimation(0, 'bow', true);
     });
 
     // ウィンドウリサイズ対応
