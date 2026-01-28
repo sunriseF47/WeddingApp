@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="WebAR名刺 - 名刺をカメラに映すと3Dキャラクターが表示されます">
+    <title>WebAR名刺</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            text-align: center;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px 40px;
+            border-radius: 10px;
+        }
+
+        #loading.hidden {
+            display: none;
+        }
+
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 10;
+            max-width: 300px;
+        }
+
+        #info.hidden {
+            display: none;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        #controls.hidden {
+            display: none;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:hover {
+            background: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-left {
+            background: rgba(74, 144, 226, 0.9);
+            color: #fff;
+        }
+
+        .btn-right {
+            background: rgba(226, 74, 74, 0.9);
+            color: #fff;
+        }
+
+        #error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff4444;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 100;
+            display: none;
+        }
+
+        #error.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="loading">
+            <div>WebARを読み込み中...</div>
+            <div style="margin-top: 10px; font-size: 12px; opacity: 0.7;">カメラの許可をお願いします</div>
+        </div>
+
+        <div id="info" class="hidden">
+            <div style="font-weight: 600; margin-bottom: 8px;">📱 WebAR名刺</div>
+            <div style="font-size: 12px; line-height: 1.6;">
+                名刺をカメラに映してください<br>
+                左右のボタンでアニメーションを切り替えられます
+            </div>
+        </div>
+
+        <div id="controls" class="hidden">
+            <button class="btn btn-left" id="btnLeftWave">👋 左: Wave</button>
+            <button class="btn btn-right" id="btnRightBow">🙇 右: Bow</button>
+        </div>
+
+        <div id="error"></div>
+    </div>
+
+    <!-- ES Module 用 importmap（MindAR v1.2+ / Three.js r150+ 対応） -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+            "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+        }
+    }
+    </script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
