@@ -199,6 +199,7 @@ https://[ユーザー名].github.io/[リポジトリ名]/
   - アニメーション名に `idle`, `wave`, `bow`, `dance` のキーワードが含まれているか確認
 - ✅ GLB ファイルにアニメーションが含まれているか確認（Blender 等で確認）
 - ✅ アニメーション名を変更するか、`main.js` の `ANIM_KEYWORDS` を調整
+- **convert-fbx-to-glb.js で複数 FBX をマージした GLB の場合**: 各 FBX が別々のメッシュ・スケルトンを持っていると、マージ後は「複数のキャラクター」が1ファイルに入った状態になり、再生するアニメーションが表示中のメッシュと紐づかないことがあります。**1体のキャラクターで bow / wave / dance を切り替えたい場合は**、Blender 等で**1本のスケルトンに複数アニメーション（Bow, Wave, Dance）を載せた1つの FBX** を作成し、それを GLB に変換して `person_left.glb` / `person_right.glb` に使うことを推奨します。
 
 ### 5. iOS Safari での問題
 
