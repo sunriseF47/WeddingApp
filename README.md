@@ -30,7 +30,7 @@ WebAR/
 
 ```bash
 npm install
-# 入力・出力を指定（出力を省略すると入力と同じディレクトリに merged.glb を出力）
+# 入力・出力を指定（出力を省略すると入力フォルダの親ディレクトリに merged.glb を出力）
 node scripts/convert-fbx-to-glb.js --input <入力ディレクトリ> [--output <出力ディレクトリ>]
 node scripts/convert-fbx-to-glb.js -i model/Groom_model -o dist
 
@@ -38,8 +38,8 @@ node scripts/convert-fbx-to-glb.js -i model/Groom_model -o dist
 npm run convert-groom
 ```
 
-- **入力**: 指定ディレクトリ内のすべての `.fbx` を検出してマージ（FBX が参照する PNG は同フォルダから読み込まれる）
-- **出力**: 指定しなければ入力と同じディレクトリに `merged.glb` を出力
+- **入力**: 指定ディレクトリ内の `.fbx` をマージ。`scripts/convert-fbx-to-glb.js` 先頭の `FBX_INCLUDE_LIST` で含める FBX を限定できる（空の場合はフォルダ内のすべての .fbx を含む）
+- **出力**: 指定しなければ入力フォルダと同じ階層（入力の親ディレクトリ）に `merged.glb` を出力
 
 ## 🚀 ローカル確認手順
 
@@ -196,7 +196,7 @@ https://[ユーザー名].github.io/[リポジトリ名]/
 
 - ✅ ブラウザのコンソールでアニメーション名のログを確認
   - `📋 利用可能なアニメーション:` のログを確認
-  - アニメーション名に `idle`, `wave`, `bow` のキーワードが含まれているか確認
+  - アニメーション名に `idle`, `wave`, `bow`, `dance` のキーワードが含まれているか確認
 - ✅ GLB ファイルにアニメーションが含まれているか確認（Blender 等で確認）
 - ✅ アニメーション名を変更するか、`main.js` の `ANIM_KEYWORDS` を調整
 
@@ -300,6 +300,7 @@ const ANIM_KEYWORDS = {
   idle: ["idle", "stand", "rest", "default"],
   wave: ["wave", "waving", "hand", "hello", "hi"],
   bow: ["bow", "bowing", "bow_down", "respect"],
+  dance: ["dance", "dancing"],
 };
 ```
 

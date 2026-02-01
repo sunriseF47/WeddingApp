@@ -23,6 +23,7 @@ const ANIM_KEYWORDS = {
   idle: ["idle", "stand", "rest", "default"],
   wave: ["wave", "waving", "hand", "hello", "hi"],
   bow: ["bow", "bowing", "bow_down", "respect"],
+  dance: ["dance", "dancing"],
 };
 
 // 左・右で別々の .glb を指定（2体別々に表示）
@@ -305,6 +306,7 @@ function setupModel(model, config, index, gltfAnimations) {
       idle: findAnimation(gltfAnimations, "idle"),
       wave: findAnimation(gltfAnimations, "wave"),
       bow: findAnimation(gltfAnimations, "bow"),
+      dance: findAnimation(gltfAnimations, "dance"),
     };
 
     // 見つかったアニメーションを登録
@@ -438,9 +440,14 @@ function setupEventListeners() {
     playAnimation(0, "wave", true);
   });
 
-  // 右側ボタン: Bow（右のモデル）
+  // 右側ボタン: Bow
   document.getElementById("btnRightBow").addEventListener("click", () => {
     playAnimation(1, "bow", true);
+  });
+
+  // Dance ボタン（左のモデルで再生）
+  document.getElementById("btnLeftDance").addEventListener("click", () => {
+    playAnimation(0, "dance", true);
   });
 
   // ウィンドウリサイズ対応
