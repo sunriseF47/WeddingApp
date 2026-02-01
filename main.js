@@ -17,6 +17,7 @@ let mixers = []; // [左ミキサー, 右ミキサー]
 let animations = []; // [[左アニメ], [右アニメ]]
 let currentAnimations = [null, null]; // 現在再生中のアニメーション
 let clock = null;
+let stickerMesh = null; // 中央ステッカー（アニメーションに応じてテキスト更新用）
 
 // アニメーション名のキーワード（探索用）
 const ANIM_KEYWORDS = {
@@ -44,6 +45,29 @@ const MODEL_CONFIG = {
     scale: 0.8,
     rotation: { x: 0, y: 0, z: 0 },
   },
+};
+
+// 中央ステッカー設定（二人の真ん中に表示）
+const STICKER_CONFIG = {
+  type: "text",
+  imagePath: "./assets/sticker.png",
+  text: "Hello!",
+  fontSize: 48,
+  fontFamily: "sans-serif",
+  textColor: "#ffffff",
+  backgroundColor: "rgba(0, 0, 0, 0.6)",
+  position: { x: 0, y: 0.05, z: 0 },
+  width: 0.08,
+  height: 0.04,
+  rotation: { x: 0, y: 0, z: 0 },
+};
+
+// アニメーション別ステッカー文言（bow / wave / dance で切り替え）
+const STICKER_TEXTS = {
+  idle: "Hello!",
+  bow: "来ていただいてありがとうございます",
+  wave: "こんにちは",
+  dance: "ぜひ楽しんでください",
 };
 
 // ============================================
@@ -82,6 +106,13 @@ async function init() {
 
     // 2体分の .glb を読み込み（左・右別ファイル）
     await loadModels(anchor);
+
+    // 中央ステッカー（二人の真ん中）を追加
+    const sticker = await createSticker();
+    if (sticker) {
+      anchor.group.add(sticker);
+      stickerMesh = sticker;
+    }
 
     // イベントリスナーの設定
     setupEventListeners();
@@ -175,6 +206,93 @@ async function loadModels(anchor) {
     console.log("❌ ターゲット見失い");
     onTargetLost();
   };
+}
+
+// ============================================
+// 文字から Canvas テクスチャを生成（ステッカー用）
+// ============================================
+function createTextTexture(text) {
+  const cfg = STICKER_CONFIG;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const padding = 20;
+  const font = `bold ${cfg.fontSize}px ${cfg.fontFamily}`;
+  ctx.font = font;
+  const metrics = ctx.measureText(text);
+  canvas.width = Math.ceil(metrics.width + padding * 2);
+  canvas.height = Math.ceil(cfg.fontSize + padding * 2);
+  ctx.fillStyle = cfg.backgroundColor;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.font = font;
+  ctx.fillStyle = cfg.textColor;
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, padding, canvas.height / 2);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+// ============================================
+// 中央ステッカー作成（画像 or 文字）
+// ============================================
+function createSticker() {
+  const cfg = STICKER_CONFIG;
+  const { position, width } = cfg;
+
+  if (cfg.type === "image") {
+    return new Promise((resolve) => {
+      const loader = new THREE.TextureLoader();
+      loader.load(
+        cfg.imagePath,
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          const aspect = texture.image ? texture.image.height / texture.image.width : 1;
+          const plane = new THREE.Mesh(
+            new THREE.PlaneGeometry(width, width * aspect),
+            new THREE.MeshBasicMaterial({
+              map: texture,
+              transparent: true,
+              side: THREE.DoubleSide,
+            }),
+          );
+          plane.position.set(position.x, position.y, position.z);
+          plane.rotation.set(cfg.rotation.x, cfg.rotation.y, cfg.rotation.z);
+          resolve(plane);
+        },
+        undefined,
+        () => resolve(null),
+      );
+    });
+  }
+
+  const texture = createTextTexture(cfg.text);
+  const tempCtx = document.createElement("canvas").getContext("2d");
+  tempCtx.font = `bold ${cfg.fontSize}px ${cfg.fontFamily}`;
+  const textW = tempCtx.measureText(cfg.text).width + 40;
+  const textH = cfg.fontSize + 40;
+  const aspect = textH / textW;
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(width, width * aspect),
+    new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+    }),
+  );
+  plane.position.set(position.x, position.y, position.z);
+  plane.rotation.set(cfg.rotation.x, cfg.rotation.y, cfg.rotation.z);
+  return Promise.resolve(plane);
+}
+
+// ============================================
+// ステッカー文言をアニメーションに応じて更新
+// ============================================
+function updateStickerText(animType) {
+  if (!stickerMesh || STICKER_CONFIG.type !== "text") return;
+  const text = STICKER_TEXTS[animType] ?? STICKER_CONFIG.text;
+  const oldMap = stickerMesh.material.map;
+  if (oldMap) oldMap.dispose();
+  stickerMesh.material.map = createTextTexture(text);
 }
 
 // デバッグ用: アニメーション名一覧をコンソールに出力
@@ -310,6 +428,7 @@ function onTargetFound() {
   // デフォルト表示は bow（両モデル）
   playAnimation(0, "bow", true);
   playAnimation(1, "bow", true);
+  updateStickerText("bow");
 }
 
 // ============================================
@@ -339,19 +458,25 @@ function updateAnimations() {
 // イベントリスナーの設定
 // ============================================
 function setupEventListeners() {
-  // 左側ボタン: Wave
+  // Wave: 両モデル同じ動き
   document.getElementById("btnLeftWave").addEventListener("click", () => {
     playAnimation(0, "wave", true);
+    playAnimation(1, "wave", true);
+    updateStickerText("wave");
   });
 
-  // 右側ボタン: Bow
+  // Bow: 両モデル同じ動き
   document.getElementById("btnRightBow").addEventListener("click", () => {
+    playAnimation(0, "bow", true);
     playAnimation(1, "bow", true);
+    updateStickerText("bow");
   });
 
-  // Dance ボタン（左のモデルで再生）
+  // Dance: 両モデル同じ動き
   document.getElementById("btnLeftDance").addEventListener("click", () => {
     playAnimation(0, "dance", true);
+    playAnimation(1, "dance", true);
+    updateStickerText("dance");
   });
 
   // ウィンドウリサイズ対応
