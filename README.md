@@ -15,11 +15,31 @@ WebAR/
 │   │   └── person_right.glb  # 右側に表示する3Dモデル
 │   └── targets/
 │       └── card.mind       # 画像ターゲット（名刺画像から生成）
+├── scripts/
+│   └── convert-fbx-to-glb.js    # FBX+PNG → 1つのGLBに変換
 └── model/                 # 既存のGLBファイル（参考用）
+    ├── Groom_model/       # 変換元例（2 FBX + 1 PNG → merged.glb）
     ├── Meshy_AI_Animation_Running_withSkin.glb
     ├── Meshy_AI_Animation_Walking_withSkin.glb
     └── Meshy_AI_Animation_Wave_One_Hand_withSkin.glb
 ```
+
+### FBX + PNG → 1つの GLB に変換
+
+指定フォルダ内の FBX ファイル（と同フォルダの PNG 等テクスチャ）を1つの GLB にまとめます。
+
+```bash
+npm install
+# 入力・出力を指定（出力を省略すると入力と同じディレクトリに merged.glb を出力）
+node scripts/convert-fbx-to-glb.js --input <入力ディレクトリ> [--output <出力ディレクトリ>]
+node scripts/convert-fbx-to-glb.js -i model/Groom_model -o dist
+
+# model/Groom_model を入力・出力に使う場合（従来どおり）
+npm run convert-groom
+```
+
+- **入力**: 指定ディレクトリ内のすべての `.fbx` を検出してマージ（FBX が参照する PNG は同フォルダから読み込まれる）
+- **出力**: 指定しなければ入力と同じディレクトリに `merged.glb` を出力
 
 ## 🚀 ローカル確認手順
 

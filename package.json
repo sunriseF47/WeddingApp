@@ -1,0 +1,16 @@
+{
+  "name": "webar",
+  "version": "1.0.0",
+  "description": "WebAR名刺 - FBX to GLB conversion",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "convert-fbx-to-glb": "node scripts/convert-fbx-to-glb.js",
+    "convert-groom": "node scripts/convert-fbx-to-glb.js -i model/Groom_model"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^3.10.0",
+    "@gltf-transform/functions": "^3.10.0",
+    "fbx2gltf": "^0.9.7-p1"
+  }
+}
