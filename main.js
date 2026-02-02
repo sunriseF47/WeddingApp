@@ -779,10 +779,10 @@ function drawHandHighlight(landmarks, isPinchingNow) {
   for (const [start, end] of HAND_CONNECTIONS) {
     const p1 = landmarks[start];
     const p2 = landmarks[end];
-    // MediaPipeのランドマークは正規化座標（0-1）、X軸は反転
-    const x1 = (1 - p1.x) * w;
+    // MediaPipeのランドマークは正規化座標（0-1）
+    const x1 = p1.x * w;
     const y1 = p1.y * h;
-    const x2 = (1 - p2.x) * w;
+    const x2 = p2.x * w;
     const y2 = p2.y * h;
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -794,7 +794,7 @@ function drawHandHighlight(landmarks, isPinchingNow) {
   ctx.shadowBlur = 15;
   for (let i = 0; i < landmarks.length; i++) {
     const p = landmarks[i];
-    const x = (1 - p.x) * w;
+    const x = p.x * w;
     const y = p.y * h;
     // 指先（4, 8, 12, 16, 20）は大きく表示
     const radius = [4, 8, 12, 16, 20].includes(i) ? 8 : 5;
@@ -807,9 +807,9 @@ function drawHandHighlight(landmarks, isPinchingNow) {
   if (isPinchingNow) {
     const thumb = landmarks[4];
     const index = landmarks[8];
-    const tx = (1 - thumb.x) * w;
+    const tx = thumb.x * w;
     const ty = thumb.y * h;
-    const ix = (1 - index.x) * w;
+    const ix = index.x * w;
     const iy = index.y * h;
     const midX = (tx + ix) / 2;
     const midY = (ty + iy) / 2;
@@ -1058,22 +1058,22 @@ function updateModelPositionAndScale() {
   const height = window.innerHeight;
   const aspect = width / height;
 
-  // 基準サイズ（幅800px）に対するスケール係数
-  const baseWidth = 800;
+  // 基準サイズ（幅1000px）に対するスケール係数
+  const baseWidth = 1000;
   const scaleFactor = Math.min(width, height) / baseWidth;
-  modelBaseScale = Math.max(0.8, Math.min(1.5, scaleFactor)); // 0.8〜1.5の範囲に制限（スマホで小さすぎないように）
+  modelBaseScale = Math.max(0.6, Math.min(1.2, scaleFactor)); // 0.6〜1.2の範囲に制限（スマホで大きすぎないように）
 
   // カメラの視野角から適切な距離を計算（モデルが画面に収まるように）
   const vFov = (camera.fov * Math.PI) / 180;
-  // 画面の高さの約40%をモデルが占める距離
+  // 画面の高さの約30%をモデルが占める距離
   const modelHeight = 0.5; // モデルのおおよその高さ（メートル）
-  const targetScreenRatio = 0.4;
+  const targetScreenRatio = 0.3;
   const distance = modelHeight / (2 * Math.tan(vFov / 2) * targetScreenRatio);
 
   // 中心位置は常にカメラの正面
   // モデルの原点が足元にあるため、Y軸を下げて画面中央に表示
   const modelCenterOffset = -0.25; // モデルの高さの半分程度を下げる
-  modelInitialPosition.set(0, modelCenterOffset, -Math.max(1.0, Math.min(3, distance)));
+  modelInitialPosition.set(0, modelCenterOffset, -Math.max(1.4, Math.min(3.2, distance)));
 
   // 現在操作中でなければ、モデルの位置とスケールを即座に更新
   if (!isPinching && !isThrown) {
