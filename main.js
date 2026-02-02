@@ -646,7 +646,23 @@ function installMediaPipeLogFilter() {
 async function initHandTracking() {
   try {
     installMediaPipeLogFilter();
-    const { HandLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision").catch(() => ({}));
+    let visionModule = null;
+    try {
+      visionModule = await import("@mediapipe/tasks-vision");
+    } catch (err) {
+      console.warn("⚠️ MediaPipe のローカル読み込みに失敗:", err);
+    }
+    if (!visionModule) {
+      try {
+        visionModule = await import(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs",
+        );
+        console.log("✅ MediaPipe を CDN から読み込みました");
+      } catch (err) {
+        console.warn("⚠️ MediaPipe の CDN 読み込みに失敗:", err);
+      }
+    }
+    const { HandLandmarker, FilesetResolver } = visionModule || {};
     if (!HandLandmarker || !FilesetResolver) {
       console.warn("⚠️ MediaPipe の読み込みに失敗しました");
       return;
@@ -1045,7 +1061,7 @@ function updateModelPositionAndScale() {
   // 基準サイズ（幅800px）に対するスケール係数
   const baseWidth = 800;
   const scaleFactor = Math.min(width, height) / baseWidth;
-  modelBaseScale = Math.max(0.5, Math.min(1.5, scaleFactor)); // 0.5〜1.5の範囲に制限
+  modelBaseScale = Math.max(0.8, Math.min(1.5, scaleFactor)); // 0.8〜1.5の範囲に制限（スマホで小さすぎないように）
 
   // カメラの視野角から適切な距離を計算（モデルが画面に収まるように）
   const vFov = (camera.fov * Math.PI) / 180;
@@ -1057,7 +1073,7 @@ function updateModelPositionAndScale() {
   // 中心位置は常にカメラの正面
   // モデルの原点が足元にあるため、Y軸を下げて画面中央に表示
   const modelCenterOffset = -0.25; // モデルの高さの半分程度を下げる
-  modelInitialPosition.set(0, modelCenterOffset, -Math.max(1.5, Math.min(3, distance)));
+  modelInitialPosition.set(0, modelCenterOffset, -Math.max(1.0, Math.min(3, distance)));
 
   // 現在操作中でなければ、モデルの位置とスケールを即座に更新
   if (!isPinching && !isThrown) {
