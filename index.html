@@ -152,7 +152,7 @@
         <div id="error"></div>
     </div>
 
-    <!-- ES Module 用 importmap（MindAR v1.2+ / Three.js r150+ 対応） -->
+    <!-- Three.js / MindAR は import map で CDN、MediaPipe は npm（Vite が解決）。開発: npm run dev -->
     <script type="importmap">
     {
         "imports": {
@@ -162,6 +162,6 @@
         }
     }
     </script>
-    <script type="module" src="main.js"></script>
+    <script type="module" src="/main.js"></script>
 </body>
 </html>

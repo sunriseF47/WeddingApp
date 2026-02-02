@@ -55,7 +55,20 @@ npm run convert-groom
 
 **⚠️ 重要**: WebAR は HTTPS または localhost でのみ動作します。カメラ API のセキュリティ制約のため、`file://`プロトコルでは動作しません。
 
-#### 方法 1: Python（推奨）
+#### 方法 1: Vite（推奨・手検出あり）
+
+手検出（MediaPipe）は npm パッケージ `@mediapipe/tasks-vision` を使用するため、Vite で起動すると正しく読み込まれます。
+
+```bash
+npm install
+# canvas 等のネイティブビルドで失敗する場合は --ignore-scripts を付けて再実行
+npm install --ignore-scripts
+npm run dev
+```
+
+ブラウザで `http://localhost:5173` にアクセス
+
+#### 方法 2: Python
 
 ```bash
 # Python 3の場合
@@ -67,7 +80,7 @@ python -m SimpleHTTPServer 8000
 
 ブラウザで `http://localhost:8000` にアクセス
 
-#### 方法 2: Node.js (http-server)
+#### 方法 3: Node.js (http-server)
 
 ```bash
 # インストール（初回のみ）
@@ -79,7 +92,7 @@ http-server -p 8000
 
 ブラウザで `http://localhost:8000` にアクセス
 
-#### 方法 3: PHP
+#### 方法 4: PHP
 
 ```bash
 php -S localhost:8000
