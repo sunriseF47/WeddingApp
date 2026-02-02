@@ -125,8 +125,8 @@ php -S localhost:8000
 # Gitリポジトリの初期化（まだの場合）
 git init
 
-# ファイルをステージング
-git add index.html main.js assets/ README.md
+# ファイルをステージング（ビルド成果物は .gitignore で除外してよい）
+git add index.html main.js assets/ README.md package.json vite.config.js
 
 # コミット
 git commit -m "Initial commit: WebARプロジェクト"
@@ -139,15 +139,37 @@ git branch -M main
 git push -u origin main
 ```
 
-### 2. GitHub Pages の有効化
+### 2. ビルドしてデプロイ用ファイルを用意
 
-1. GitHub リポジトリのページにアクセス
-2. **Settings** → **Pages** を開く
-3. **Source** で **Deploy from a branch** を選択
-4. **Branch** で `main` を選択、フォルダは `/ (root)` を選択
-5. **Save** をクリック
+**重要**: このプロジェクトは Vite でビルドした **dist/** を公開する前提です（MediaPipe 等の npm 依存を含むため）。
 
-### 3. アクセス URL
+```bash
+npm install
+npm run build
+```
+
+生成された `dist/` の中身を GitHub Pages で配信します（次のいずれか）。
+
+### 3. GitHub Pages の有効化
+
+**方法 A: gh-pages ブランチに dist をプッシュ**
+
+```bash
+# ビルド後、dist の中身を gh-pages ブランチのルートに
+npx gh-pages -d dist
+# または手動で: dist/ の中身を別ブランチにコピーして push
+```
+
+1. GitHub リポジトリの **Settings** → **Pages**
+2. **Source**: Deploy from a branch
+3. **Branch**: `gh-pages`、**Folder**: `/ (root)` → Save
+
+**方法 B: main の / (root) でソースを公開（非推奨）**
+
+- Branch: `main`、Folder: `/ (root)` の場合、`index.html` のスクリプトは **相対パス**（`./main.js`）にしてあるため、`main.js` の 404 は防げます。
+- ただし MediaPipe 等は npm パッケージのため、**ビルドせずにソースのままでは動作しません**。必ず **方法 A** か GitHub Actions でビルドしてから公開してください。
+
+### 4. アクセス URL
 
 数分後、以下の URL でアクセスできます：
 
@@ -155,7 +177,7 @@ git push -u origin main
 https://[ユーザー名].github.io/[リポジトリ名]/
 ```
 
-### 4. QR コードの生成
+### 5. QR コードの生成
 
 公開 URL を QR コードに変換して、画像として配布したり、パンフレット等の印刷物に掲載します。
 
@@ -260,16 +282,42 @@ https://[ユーザー名].github.io/[リポジトリ名]/
 - ✅ ローカル開発時は `localhost` または `127.0.0.1` を使用
 - ✅ 本番環境では必ず HTTPS を使用
 
-### 9. パスの問題（GitHub Pages のサブパス配信）
+### 9. main.js が 404 になる（GitHub Pages で「読み込み中...」で止まる）
+
+**症状**: `main.js` が 404、画面が「WebARを読み込み中...」のまま
+
+**原因**: 
+- `index.html` のスクリプトが絶対パス（`/main.js`）だと、`https://user.github.io/リポジトリ名/` ではルートの `/main.js` を参照して 404 になる
+- このプロジェクトは Vite でビルドして **ビルド結果（dist/）** を公開する前提です
+
+**対策**:
+
+1. **スクリプトを相対パスに変更済み**  
+   `index.html` では `<script type="module" src="./main.js">` のように相対パス（`./main.js`）を使用しています。
+
+2. **GitHub Pages にはビルド結果をデプロイする**  
+   ソースのままではなく、必ずビルドしてから **dist の中身** を公開してください。
+
+   ```bash
+   npm run build
+   ```
+
+   その後、次のいずれかで公開します。
+
+   - **方法 A（gh-pages ブランチ）**: `dist/` の中身を `gh-pages` ブランチにプッシュし、Settings → Pages で Branch: `gh-pages` / Folder: `/ (root)` を選択
+   - **方法 B（docs フォルダ）**: ビルド出力を `docs/` に出すよう `vite.config.js` の `outDir: 'docs'` にし、`docs/` をコミット。Settings → Pages で Branch: `main` / Folder: `docs` を選択
+   - **方法 C（GitHub Actions）**: ワークフローで `npm run build` を実行し、生成した `dist/` を GitHub Pages にデプロイ
+
+### 10. パスの問題（GitHub Pages のサブパス配信）
 
 **症状**: GitHub Pages で画像やモデルが読み込まれない
 
 **対策**:
 
 - ✅ すべてのパスを相対パス（`./assets/...`）で記述済み
-- ✅ 絶対パス（`/assets/...`）は使用していないため、サブパス配信でも動作
+- ✅ `vite.config.js` で `base: "./"` を指定しているため、サブパス（`/リポジトリ名/`）配信でも動作
 
-### 10. デバッグ方法
+### 11. デバッグ方法
 
 **ブラウザの開発者ツールを使用**:
 
