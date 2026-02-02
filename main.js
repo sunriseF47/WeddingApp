@@ -33,7 +33,7 @@ let modelVelocity = new THREE.Vector3(0, 0, 0);
 let isThrown = false;
 let lastPinchPos = new THREE.Vector3();
 let lastInteractionTime = 0; // 最後に操作した時刻
-const RETURN_TO_CENTER_DELAY = 3000; // 操作後何msで中央に戻るか
+const RETURN_TO_CENTER_DELAY = 2000; // 操作後何msで中央に戻るか
 let lastPinchEndTime = 0; // ピンチ解除した時刻（クールダウン用）
 const PINCH_COOLDOWN = 1000; // ピンチ解除後のクールダウン（ms）
 let modelInitialPosition = new THREE.Vector3(0, 0, -2); // 初期位置（動的に計算）
@@ -956,15 +956,15 @@ function updateHandAndInteraction() {
     const elapsed = performance.now() - lastInteractionTime;
     if (elapsed > RETURN_TO_CENTER_DELAY) {
       // 滑らかに初期位置とスケールに戻す
-      modelGroup.position.lerp(modelInitialPosition, 0.1); // より速く戻す
+      modelGroup.position.lerp(modelInitialPosition, 0.12); // 少し速く戻す
       const targetScale = new THREE.Vector3(modelBaseScale, modelBaseScale, modelBaseScale);
-      modelGroup.scale.lerp(targetScale, 0.1);
+      modelGroup.scale.lerp(targetScale, 0.12);
       // 十分近づいたらリセット
       const dist = modelGroup.position.distanceTo(modelInitialPosition);
-      if (dist < 0.05) {
+      if (dist < 0.03) {
         modelGroup.position.copy(modelInitialPosition);
         modelGroup.scale.set(modelBaseScale, modelBaseScale, modelBaseScale);
-        lastInteractionTime = 0;
+        lastInteractionTime = performance.now(); // 次の戻り判定のために更新
         console.log("🎯 モデルが初期位置に戻りました");
       }
     }
@@ -1058,27 +1058,28 @@ function updateModelPositionAndScale() {
   const height = window.innerHeight;
   const aspect = width / height;
 
-  // 基準サイズ（幅1000px）に対するスケール係数
-  const baseWidth = 1000;
+  // 基準サイズ（幅900px）に対するスケール係数
+  const baseWidth = 900;
   const scaleFactor = Math.min(width, height) / baseWidth;
-  modelBaseScale = Math.max(0.6, Math.min(1.2, scaleFactor)); // 0.6〜1.2の範囲に制限（スマホで大きすぎないように）
+  modelBaseScale = Math.max(0.7, Math.min(1.4, scaleFactor)); // 0.7〜1.4の範囲に制限（スマホで見えやすく）
 
   // カメラの視野角から適切な距離を計算（モデルが画面に収まるように）
   const vFov = (camera.fov * Math.PI) / 180;
-  // 画面の高さの約30%をモデルが占める距離
+  // 画面の高さの約28%をモデルが占める距離
   const modelHeight = 0.5; // モデルのおおよその高さ（メートル）
-  const targetScreenRatio = 0.3;
+  const targetScreenRatio = 0.28;
   const distance = modelHeight / (2 * Math.tan(vFov / 2) * targetScreenRatio);
 
   // 中心位置は常にカメラの正面
   // モデルの原点が足元にあるため、Y軸を下げて画面中央に表示
-  const modelCenterOffset = -0.25; // モデルの高さの半分程度を下げる
-  modelInitialPosition.set(0, modelCenterOffset, -Math.max(1.4, Math.min(3.2, distance)));
+  const modelCenterOffset = -0.2; // モデルの高さの半分程度を下げる
+  modelInitialPosition.set(0, modelCenterOffset, -Math.max(1.1, Math.min(2.6, distance)));
 
   // 現在操作中でなければ、モデルの位置とスケールを即座に更新
   if (!isPinching && !isThrown) {
     modelGroup.position.copy(modelInitialPosition);
     modelGroup.scale.set(modelBaseScale, modelBaseScale, modelBaseScale);
+    lastInteractionTime = performance.now(); // リサイズ後も中央復帰を確実にする
   }
 
   console.log(
