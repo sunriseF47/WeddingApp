@@ -14,7 +14,6 @@
   "dependencies": {
     "@gltf-transform/core": "^3.10.0",
     "@gltf-transform/functions": "^3.10.0",
-    "@mediapipe/tasks-vision": "^0.10.14",
     "fbx2gltf": "^0.9.7-p1",
     "mind-ar": "^1.2.5",
     "sharp": "^0.33.0",

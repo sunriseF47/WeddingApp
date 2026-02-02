@@ -708,20 +708,15 @@ async function initHandTracking() {
   try {
     installMediaPipeLogFilter();
     let visionModule = null;
+
+    // 開発・本番とも CDN のみ（常に本番と同じ挙動）
     try {
-      visionModule = await import("@mediapipe/tasks-vision");
+      visionModule = await import(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs",
+      );
+      console.log("✅ MediaPipe を CDN から読み込みました");
     } catch (err) {
-      console.warn("⚠️ MediaPipe のローカル読み込みに失敗:", err);
-    }
-    if (!visionModule) {
-      try {
-        visionModule = await import(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs",
-        );
-        console.log("✅ MediaPipe を CDN から読み込みました");
-      } catch (err) {
-        console.warn("⚠️ MediaPipe の CDN 読み込みに失敗:", err);
-      }
+      console.warn("⚠️ MediaPipe の CDN 読み込みに失敗:", err);
     }
     const { HandLandmarker, FilesetResolver } = visionModule || {};
     if (!HandLandmarker || !FilesetResolver) {

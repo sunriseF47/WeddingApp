@@ -57,7 +57,7 @@ npm run convert-groom
 
 #### 方法 1: Vite（推奨・手検出あり）
 
-手検出（MediaPipe）は npm パッケージ `@mediapipe/tasks-vision` を使用するため、Vite で起動すると正しく読み込まれます。
+手検出（MediaPipe）は CDN から読み込むため、開発・本番で同じ挙動になります。
 
 ```bash
 npm install
