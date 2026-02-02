@@ -37,6 +37,7 @@ let modelBaseHeight = 0; // モデルの基準高さ（スケール1時）
 let modelBaseCenterY = 0; // モデルの基準中心Y（スケール1時）
 let hasCenteredOnce = false; // 初期中心合わせ済みフラグ
 let containerResizeObserver = null;
+let initialSyncTimer = null;
 let modelInitialPosition = new THREE.Vector3(0, 0, -2); // 初期位置（動的に計算）
 let modelBaseScale = 1.0; // ウィンドウサイズに応じたスケール
 let pinchIndicator = null; // ピンチ中のUI表示
@@ -182,6 +183,8 @@ async function initCameraFixedMode() {
   syncViewSize();
   requestAnimationFrame(() => syncViewSize());
   setTimeout(() => syncViewSize(), 100);
+  setTimeout(() => syncViewSize(), 300);
+  setTimeout(() => syncViewSize(), 600);
 
   clock = new THREE.Clock();
 
@@ -211,6 +214,32 @@ async function initCameraFixedMode() {
     hasCenteredOnce = false;
   });
   containerResizeObserver.observe(container);
+
+  // 初回起動時のサイズ確定待ち（ビルド版の遅延レイアウト対策）
+  if (initialSyncTimer) {
+    clearInterval(initialSyncTimer);
+  }
+  let lastW = 0;
+  let lastH = 0;
+  let elapsed = 0;
+  initialSyncTimer = setInterval(() => {
+    const rectNow = container.getBoundingClientRect();
+    const w = Math.round(rectNow.width);
+    const h = Math.round(rectNow.height);
+    if (w && h && (w !== lastW || h !== lastH)) {
+      lastW = w;
+      lastH = h;
+      syncViewSize();
+      hasCenteredOnce = false;
+    }
+    elapsed += 100;
+    if (elapsed >= 2000) {
+      clearInterval(initialSyncTimer);
+      initialSyncTimer = null;
+      syncViewSize();
+      hasCenteredOnce = false;
+    }
+  }, 100);
 
   // 手検出
   initHandTracking().catch((e) => console.warn("⚠️ 手検出の初期化に失敗:", e));
