@@ -36,6 +36,9 @@ let lastInteractionTime = 0; // 最後に操作した時刻
 const RETURN_TO_CENTER_DELAY = 2000; // 操作後何msで中央に戻るか
 let lastPinchEndTime = 0; // ピンチ解除した時刻（クールダウン用）
 const PINCH_COOLDOWN = 1000; // ピンチ解除後のクールダウン（ms）
+let modelBaseHeight = 0; // モデルの基準高さ（スケール1時）
+let modelBaseCenterY = 0; // モデルの基準中心Y（スケール1時）
+let hasCenteredOnce = false; // 初期中心合わせ済みフラグ
 let modelInitialPosition = new THREE.Vector3(0, 0, -2); // 初期位置（動的に計算）
 let modelBaseScale = 1.0; // ウィンドウサイズに応じたスケール
 let pinchIndicator = null; // ピンチ中のUI表示
@@ -181,6 +184,7 @@ async function initCameraFixedMode() {
 
   // モデル読み込み
   await loadModelsForFixedMode();
+  hasCenteredOnce = false;
 
   // ステッカー
   const sticker = await createSticker();
@@ -197,6 +201,10 @@ async function initCameraFixedMode() {
 
   // アニメーションループ
   renderer.setAnimationLoop(() => {
+    if (!hasCenteredOnce && modelGroup) {
+      updateModelPositionAndScale();
+      hasCenteredOnce = true;
+    }
     updateAnimations();
     updateHandAndInteraction();
     renderer.render(scene, camera);
@@ -265,6 +273,14 @@ async function loadModelsForFixedMode() {
   modelGroup.add(modelLeft);
   modelGroup.add(modelRight);
   scene.add(modelGroup);
+  // モデルの基準高さと中心を取得（スケール1時）
+  const bbox = new THREE.Box3().setFromObject(modelGroup);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  bbox.getSize(size);
+  bbox.getCenter(center);
+  modelBaseHeight = Math.max(0.1, size.y);
+  modelBaseCenterY = center.y;
   // ウィンドウサイズに応じた位置とスケールを設定
   updateModelPositionAndScale();
   console.log("✅ カメラ常時表示モード: モデルを配置");
@@ -733,6 +749,18 @@ function isValidHand(landmarks) {
   return size >= 0.05 && size <= 0.4;
 }
 
+// 手が画面外に出たかどうか（ピンチ中の強制リセット用）
+function isHandOutOfView(landmarks) {
+  if (!landmarks || landmarks.length === 0) return true;
+  const margin = 0.02;
+  for (const p of landmarks) {
+    if (p.x < margin || p.x > 1 - margin || p.y < margin || p.y > 1 - margin) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const PINCH_THRESHOLD = 0.08;
 const THROW_VELOCITY_THRESHOLD = 0.3;
 const THROW_SCALE = 2.0; // 手の動きを投げ速度に反映する倍率
@@ -859,6 +887,22 @@ function updateHandAndInteraction() {
         return;
       }
       
+      // ピンチ中に手が画面外へ出た場合は中央に戻す
+      if (isPinching && isHandOutOfView(landmarks)) {
+        isPinching = false;
+        isThrown = false;
+        modelVelocity.set(0, 0, 0);
+        lastPinchEndTime = performance.now();
+        lastInteractionTime = performance.now();
+        if (modelGroup) {
+          modelGroup.position.copy(modelInitialPosition);
+          modelGroup.scale.set(modelBaseScale, modelBaseScale, modelBaseScale);
+        }
+        if (pinchIndicator) pinchIndicator.style.display = "none";
+        clearHandHighlight();
+        return;
+      }
+
       const handPos = landmarkToWorldPosition(landmarks, camera);
       if (handPos) {
         lastHandPos = handPos.clone();
@@ -875,7 +919,7 @@ function updateHandAndInteraction() {
         // ピンチ開始（クールダウン中は無視）
         if (nowPinching && !isPinching && modelGroup && !inCooldown) {
           isPinching = true;
-          grabOffset.copy(modelGroup.position).sub(handPos);
+          grabOffset.set(0, 0, 0); // つかんだ位置にそのまま追従
           lastPinchPos.copy(handPos);
           isThrown = false;
           modelVelocity.set(0, 0, 0);
@@ -908,7 +952,7 @@ function updateHandAndInteraction() {
 
         // ピンチ中: モデルを手に追従
         if (isPinching && modelGroup) {
-          modelGroup.position.copy(handPos).add(grabOffset);
+          modelGroup.position.copy(handPos);
           lastPinchPos.copy(handPos);
           lastInteractionTime = performance.now();
         }
@@ -1043,6 +1087,7 @@ function setupEventListeners() {
       // モデルの位置とスケールを再計算
       if (CAMERA_FIXED_MODE) {
         updateModelPositionAndScale();
+        hasCenteredOnce = false;
       }
     }
   });
@@ -1058,22 +1103,24 @@ function updateModelPositionAndScale() {
   const height = window.innerHeight;
   const aspect = width / height;
 
-  // 基準サイズ（幅900px）に対するスケール係数
-  const baseWidth = 900;
-  const scaleFactor = Math.min(width, height) / baseWidth;
-  modelBaseScale = Math.max(0.7, Math.min(1.4, scaleFactor)); // 0.7〜1.4の範囲に制限（スマホで見えやすく）
-
-  // カメラの視野角から適切な距離を計算（モデルが画面に収まるように）
+  // カメラの視野角から適切な距離とスケールを計算（モデル全体が入るように）
   const vFov = (camera.fov * Math.PI) / 180;
-  // 画面の高さの約28%をモデルが占める距離
-  const modelHeight = 0.5; // モデルのおおよその高さ（メートル）
-  const targetScreenRatio = 0.28;
-  const distance = modelHeight / (2 * Math.tan(vFov / 2) * targetScreenRatio);
+  const baseHeight = Math.max(0.1, modelBaseHeight || 0.5);
+  const targetScreenRatio = 0.26; // 画面の高さの約26%をモデルが占める
+
+  // まずスケール1の想定距離を計算し、距離をクランプ
+  const idealDistance = baseHeight / (2 * Math.tan(vFov / 2) * targetScreenRatio);
+  const distance = Math.max(1.2, Math.min(3.5, idealDistance));
+
+  // その距離に対して、モデルが収まるスケールを算出
+  const desiredHeight = 2 * distance * Math.tan(vFov / 2) * targetScreenRatio;
+  const scale = desiredHeight / baseHeight;
+  modelBaseScale = Math.max(0.55, Math.min(1.1, scale));
 
   // 中心位置は常にカメラの正面
-  // モデルの原点が足元にあるため、Y軸を下げて画面中央に表示
-  const modelCenterOffset = -0.2; // モデルの高さの半分程度を下げる
-  modelInitialPosition.set(0, modelCenterOffset, -Math.max(1.1, Math.min(2.6, distance)));
+  // モデルの中心が画面中心に来るように Y を補正
+  const modelCenterOffset = -(modelBaseCenterY || 0) * modelBaseScale;
+  modelInitialPosition.set(0, modelCenterOffset, -distance);
 
   // 現在操作中でなければ、モデルの位置とスケールを即座に更新
   if (!isPinching && !isThrown) {
