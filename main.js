@@ -157,13 +157,16 @@ async function initCameraFixedMode() {
   await video.play();
 
   // Three.js セットアップ
+  const rect = container.getBoundingClientRect();
+  const viewWidth = rect.width || window.innerWidth;
+  const viewHeight = rect.height || window.innerHeight;
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera = new THREE.PerspectiveCamera(75, viewWidth / viewHeight, 0.1, 100);
   camera.position.set(0, 0, 0);
   scene.add(camera); // カメラをシーンに追加（手メッシュ等のカメラの子を描画するため）
 
   renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(viewWidth, viewHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.domElement.style.cssText = "position:absolute;top:0;left:0;z-index:1;";
@@ -171,8 +174,8 @@ async function initCameraFixedMode() {
 
   // 手のハイライト表示用キャンバス（Three.jsキャンバスの上に重ねる）
   handOverlayCanvas = document.createElement("canvas");
-  handOverlayCanvas.width = window.innerWidth;
-  handOverlayCanvas.height = window.innerHeight;
+  handOverlayCanvas.width = viewWidth;
+  handOverlayCanvas.height = viewHeight;
   handOverlayCanvas.style.cssText = "position:absolute;top:0;left:0;z-index:2;pointer-events:none;";
   viewWrapper.appendChild(handOverlayCanvas);
   handOverlayCtx = handOverlayCanvas.getContext("2d");
@@ -761,6 +764,17 @@ function isHandOutOfView(landmarks) {
   return false;
 }
 
+// 手のサイズに合わせたモデルスケールを計算
+function getScaleForHandSize(landmarks, distance, cameraRef) {
+  const handSize = getHandSize(landmarks); // 正規化(0-1)
+  const vFov = (cameraRef.fov * Math.PI) / 180;
+  const viewHeight = 2 * distance * Math.tan(vFov / 2);
+  const desiredModelHeight = handSize * viewHeight;
+  if (!modelBaseHeight || modelBaseHeight <= 0) return modelBaseScale;
+  const scale = desiredModelHeight / modelBaseHeight;
+  return Math.max(0.45, Math.min(1.2, scale));
+}
+
 const PINCH_THRESHOLD = 0.08;
 const THROW_VELOCITY_THRESHOLD = 0.3;
 const THROW_SCALE = 2.0; // 手の動きを投げ速度に反映する倍率
@@ -924,8 +938,8 @@ function updateHandAndInteraction() {
           isThrown = false;
           modelVelocity.set(0, 0, 0);
           lastInteractionTime = now;
-          // 視覚フィードバック: モデルを少し大きく
-          const pinchScale = modelBaseScale * 1.1;
+          // 手のサイズに合わせてスケール
+          const pinchScale = getScaleForHandSize(landmarks, Math.abs(handPos.z), camera);
           modelGroup.scale.set(pinchScale, pinchScale, pinchScale);
           if (pinchIndicator) pinchIndicator.style.display = "block";
           console.log("✊ ピンチ開始");
@@ -955,6 +969,11 @@ function updateHandAndInteraction() {
           modelGroup.position.copy(handPos);
           lastPinchPos.copy(handPos);
           lastInteractionTime = performance.now();
+          // 手のサイズに合わせてスケールを追従（急激な変化を防ぐ）
+          const targetScale = getScaleForHandSize(landmarks, Math.abs(handPos.z), camera);
+          const currentScale = modelGroup.scale.x;
+          const nextScale = currentScale + (targetScale - currentScale) * 0.2;
+          modelGroup.scale.set(nextScale, nextScale, nextScale);
         }
       }
     } catch (e) {
@@ -1076,13 +1095,17 @@ function setupEventListeners() {
   // ウィンドウリサイズ対応
   window.addEventListener("resize", () => {
     if (camera && renderer) {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const container = document.getElementById("container");
+      const rect = container ? container.getBoundingClientRect() : null;
+      const width = rect && rect.width ? rect.width : window.innerWidth;
+      const height = rect && rect.height ? rect.height : window.innerHeight;
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(width, height);
       // 手のハイライトキャンバスもリサイズ
       if (handOverlayCanvas) {
-        handOverlayCanvas.width = window.innerWidth;
-        handOverlayCanvas.height = window.innerHeight;
+        handOverlayCanvas.width = width;
+        handOverlayCanvas.height = height;
       }
       // モデルの位置とスケールを再計算
       if (CAMERA_FIXED_MODE) {
@@ -1099,23 +1122,24 @@ function setupEventListeners() {
 function updateModelPositionAndScale() {
   if (!camera || !modelGroup) return;
 
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-  const aspect = width / height;
+  const container = document.getElementById("container");
+  const rect = container ? container.getBoundingClientRect() : null;
+  const width = rect && rect.width ? rect.width : window.innerWidth;
+  const height = rect && rect.height ? rect.height : window.innerHeight;
 
   // カメラの視野角から適切な距離とスケールを計算（モデル全体が入るように）
   const vFov = (camera.fov * Math.PI) / 180;
   const baseHeight = Math.max(0.1, modelBaseHeight || 0.5);
-  const targetScreenRatio = 0.26; // 画面の高さの約26%をモデルが占める
+  const targetScreenRatio = 0.22; // 画面の高さの約22%をモデルが占める
 
   // まずスケール1の想定距離を計算し、距離をクランプ
   const idealDistance = baseHeight / (2 * Math.tan(vFov / 2) * targetScreenRatio);
-  const distance = Math.max(1.2, Math.min(3.5, idealDistance));
+  const distance = Math.max(1.6, Math.min(3.8, idealDistance));
 
   // その距離に対して、モデルが収まるスケールを算出
   const desiredHeight = 2 * distance * Math.tan(vFov / 2) * targetScreenRatio;
   const scale = desiredHeight / baseHeight;
-  modelBaseScale = Math.max(0.55, Math.min(1.1, scale));
+  modelBaseScale = Math.max(0.45, Math.min(1.0, scale));
 
   // 中心位置は常にカメラの正面
   // モデルの中心が画面中心に来るように Y を補正
