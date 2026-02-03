@@ -35,6 +35,7 @@ let lastPinchEndTime = 0; // ピンチ解除した時刻（クールダウン用
 const PINCH_COOLDOWN = 1000; // ピンチ解除後のクールダウン（ms）
 let modelBaseHeight = 0; // モデルの基準高さ（スケール1時）
 let modelBaseCenterY = 0; // モデルの基準中心Y（スケール1時）
+let modelHeadTopY = 0; // モデル頭頂のY（ローカル、スケール1時）
 let hasCenteredOnce = false; // 初期中心合わせ済みフラグ
 let containerResizeObserver = null;
 let initialSyncTimer = null;
@@ -88,18 +89,18 @@ const MODEL_CONFIG_FIXED = {
   },
 };
 
-// 中央ステッカー設定（二人の真ん中に表示）
+// 中央ステッカー設定（二人の真ん中に表示 / カメラモードでは頭の上に配置）
 const STICKER_CONFIG = {
   type: "text",
   imagePath: "./assets/sticker.png",
   text: "Hello!",
-  fontSize: 48,
+  fontSize: 56,
   fontFamily: "sans-serif",
   textColor: "#ffffff",
   backgroundColor: "rgba(0, 0, 0, 0.6)",
   position: { x: 0, y: 0.05, z: 0 },
-  width: 0.08,
-  height: 0.04,
+  width: 0.15,
+  height: 0.08,
   rotation: { x: 0, y: 0, z: 0 },
 };
 
@@ -110,6 +111,16 @@ const STICKER_TEXTS = {
   wave: "こんにちは",
   dance: "ぜひ楽しんでください",
 };
+
+// 文字数に応じたステッカースケール（横幅を文字数で伸ばす）
+const STICKER_BASE_SCALE = 2.5;
+const STICKER_SCALE_PER_CHAR = 0.2; // 1文字あたりの横幅の増分
+const STICKER_HEIGHT_FACTOR = 1.2; // 高さを少し高くする係数
+function getStickerScaleForTextLength(textLength) {
+  const scaleX = STICKER_BASE_SCALE + textLength * STICKER_SCALE_PER_CHAR;
+  const scaleY = STICKER_BASE_SCALE * STICKER_HEIGHT_FACTOR;
+  return { x: scaleX, y: scaleY };
+}
 
 // ============================================
 // 初期化
@@ -199,6 +210,10 @@ async function initCameraFixedMode() {
   const sticker = await createSticker();
   if (sticker && modelGroup) {
     modelGroup.add(sticker);
+    // ステッカーをモデルの頭の上に配置。文字数に応じてスケール
+    sticker.position.y = modelHeadTopY + 0.8;
+    const initialScale = getStickerScaleForTextLength((STICKER_CONFIG.text || "").length);
+    sticker.scale.set(initialScale.x, initialScale.y, initialScale.y);
     stickerMesh = sticker;
   }
 
@@ -326,6 +341,7 @@ async function loadModelsForFixedMode() {
   bbox.getCenter(center);
   modelBaseHeight = Math.max(0.1, size.y);
   modelBaseCenterY = center.y;
+  modelHeadTopY = Math.max(center.y + size.y / 2, size.y * 0.4); // 頭頂のY（ローカル）。0のときは高さの40%をフォールバック
   // ウィンドウサイズに応じた位置とスケールを設定
   updateModelPositionAndScale();
   console.log("✅ カメラ常時表示モード: モデルを配置");
@@ -554,6 +570,9 @@ function updateStickerText(animType) {
   const oldMap = stickerMesh.material.map;
   if (oldMap) oldMap.dispose();
   stickerMesh.material.map = createTextTexture(text);
+  // 文字数に応じてステッカーの横幅を拡大（1文字分の大きさを足す）
+  const s = getStickerScaleForTextLength(text.length);
+  stickerMesh.scale.set(s.x, s.y, s.y);
 }
 
 // デバッグ用: アニメーション名一覧をコンソールに出力
@@ -745,22 +764,22 @@ async function initHandTracking() {
   }
 }
 
-// ランドマークをカメラローカル座標に変換
-function landmarkToCameraLocal(landmarks, cameraRef) {
-  if (!landmarks || landmarks.length < 9) return null;
-  const mid = landmarks[9]; // 中指付け根
-  const x = (mid.x - 0.5) * 2;
-  const y = -(mid.y - 0.5) * 2;
-  const depth = 0.8 + mid.z * 0.4;
+// ランドマークをカメラローカル座標に変換（landmarkIndex: 9=中指付け根, 4=親指先端）
+function landmarkToCameraLocal(landmarks, cameraRef, landmarkIndex = 9) {
+  if (!landmarks || landmarks.length <= landmarkIndex) return null;
+  const p = landmarks[landmarkIndex];
+  const x = (p.x - 0.5) * 2;
+  const y = -(p.y - 0.5) * 2;
+  const depth = 0.8 + (p.z || 0) * 0.4;
   const vFov = (cameraRef.fov * Math.PI) / 180;
   const h = Math.tan(vFov / 2) * depth;
   const w = h * (cameraRef.aspect || 1);
   return new THREE.Vector3(x * w, y * h, -depth);
 }
 
-// ランドマークをワールド座標に変換
-function landmarkToWorldPosition(landmarks, cameraRef) {
-  const local = landmarkToCameraLocal(landmarks, cameraRef);
+// ランドマークをワールド座標に変換（landmarkIndex: 9=中指付け根, 4=親指先端）
+function landmarkToWorldPosition(landmarks, cameraRef, landmarkIndex = 9) {
+  const local = landmarkToCameraLocal(landmarks, cameraRef, landmarkIndex);
   if (!local) return null;
   return local.applyMatrix4(cameraRef.matrixWorld);
 }
@@ -920,9 +939,20 @@ function updateHandAndInteraction() {
   if (handLandmarker) {
     try {
       const results = handLandmarker.detectForVideo(video, performance.now());
-      // 手が検出されなかった場合はハイライトをクリア
+      // 手が検出されなかった場合（画面外など）
       if (!results || !results.landmarks || results.landmarks.length === 0) {
         clearHandHighlight();
+        // 掴んでいる状態で手が見えなくなったら離した扱いにして中心に戻す
+        if (isPinching) {
+          isPinching = false;
+          lastPinchEndTime = performance.now();
+          lastInteractionTime = performance.now();
+          if (modelGroup) {
+            modelGroup.position.copy(modelInitialPosition);
+            modelGroup.scale.set(modelBaseScale, modelBaseScale, modelBaseScale);
+          }
+          if (pinchIndicator) pinchIndicator.style.display = "none";
+        }
         return;
       }
       
@@ -930,8 +960,18 @@ function updateHandAndInteraction() {
       
       // 手のサイズが妥当かチェック（誤検出フィルタ）
       if (!isValidHand(landmarks)) {
-        // サイズが不正な場合は無視
         clearHandHighlight();
+        // 掴んでいる状態で手が不正（見切れなど）なら離した扱いで中心に戻す
+        if (isPinching) {
+          isPinching = false;
+          lastPinchEndTime = performance.now();
+          lastInteractionTime = performance.now();
+          if (modelGroup) {
+            modelGroup.position.copy(modelInitialPosition);
+            modelGroup.scale.set(modelBaseScale, modelBaseScale, modelBaseScale);
+          }
+          if (pinchIndicator) pinchIndicator.style.display = "none";
+        }
         return;
       }
       
@@ -949,9 +989,11 @@ function updateHandAndInteraction() {
         return;
       }
 
-      const handPos = landmarkToWorldPosition(landmarks, camera);
-      if (handPos) {
-        lastHandPos = handPos.clone();
+      // モデル追従位置は親指先端(4)、その他は従来どおり中指付け根(9)も利用
+      const thumbPos = landmarkToWorldPosition(landmarks, camera, 4); // 親指先端
+      const handPos = landmarkToWorldPosition(landmarks, camera, 9); // 中指付け根
+      if (thumbPos && handPos) {
+        lastHandPos = thumbPos.clone();
         const pinchDist = getPinchDistance(landmarks);
         const nowPinching = pinchDist < PINCH_THRESHOLD;
         
@@ -967,13 +1009,13 @@ function updateHandAndInteraction() {
           isPinching = true;
           grabOffset.set(0, 0, 0); // つかんだ位置にそのまま追従
           lastInteractionTime = now;
-          // 手のサイズに合わせてスケール
-          const pinchScale = getScaleForHandSize(landmarks, Math.abs(handPos.z), camera);
+          // 手のサイズに合わせてスケール（親指の深度を使用）
+          const pinchScale = getScaleForHandSize(landmarks, Math.abs(thumbPos.z), camera);
           modelGroup.scale.set(pinchScale, pinchScale, pinchScale);
           if (pinchIndicator) pinchIndicator.style.display = "block";
           console.log("✊ ピンチ開始");
         }
-        // ピンチ解除
+        // ピンチ解除 → 離したら中心位置に戻る（既存の自動復帰ロジックで対応）
         else if (!nowPinching && isPinching) {
           isPinching = false;
           lastInteractionTime = now;
@@ -981,15 +1023,18 @@ function updateHandAndInteraction() {
           // 視覚フィードバック: 元のサイズに戻す
           if (modelGroup) modelGroup.scale.set(modelBaseScale, modelBaseScale, modelBaseScale);
           if (pinchIndicator) pinchIndicator.style.display = "none";
-          console.log(`✋ ピンチ解除。${RETURN_TO_CENTER_DELAY / 1000}秒後に初期位置に戻ります`);
+          console.log(`✋ ピンチ解除。${RETURN_TO_CENTER_DELAY / 1000}秒後に中心位置に戻ります`);
         }
 
-        // ピンチ中: モデルを手に追従
+        // ピンチ中: 親指先端にモデルの頭頂が来るように追従（頭オフセットを差し引く）
         if (isPinching && modelGroup) {
-          modelGroup.position.copy(handPos);
+          const headOffsetY = modelHeadTopY > 0 ? modelHeadTopY * modelGroup.scale.y : modelBaseHeight * 0.5 * modelGroup.scale.y;
+          modelGroup.position.x = thumbPos.x;
+          modelGroup.position.y = thumbPos.y - headOffsetY;
+          modelGroup.position.z = thumbPos.z;
           lastInteractionTime = performance.now();
           // 手のサイズに合わせてスケールを追従（急激な変化を防ぐ）
-          const targetScale = getScaleForHandSize(landmarks, Math.abs(handPos.z), camera);
+          const targetScale = getScaleForHandSize(landmarks, Math.abs(thumbPos.z), camera);
           const currentScale = modelGroup.scale.x;
           const nextScale = currentScale + (targetScale - currentScale) * 0.2;
           modelGroup.scale.set(nextScale, nextScale, nextScale);
@@ -1073,11 +1118,15 @@ function setupEventListeners() {
     updateStickerText("bow");
   });
 
-  // Dance: 両モデル同じ動き
+  // Dance: 右だけダンス、左は立ち（idle）。二人の距離を0.5に
   document.getElementById("btnLeftDance").addEventListener("click", () => {
-    playAnimation(0, "dance", true);
+    playAnimation(0, "idle", true);
     playAnimation(1, "dance", true);
     updateStickerText("dance");
+    if (models.length >= 2) {
+      models[0].position.x = -0.25;
+      models[1].position.x = 0.25;
+    }
   });
 
   // ウィンドウリサイズ対応
