@@ -570,9 +570,10 @@ function updateStickerText(animType) {
   const oldMap = stickerMesh.material.map;
   if (oldMap) oldMap.dispose();
   stickerMesh.material.map = createTextTexture(text);
-  // 文字数に応じてステッカーの横幅を拡大（1文字分の大きさを足す）
+  // 文字数に応じてステッカーの横幅を拡大。Bow 時はさらに広く
   const s = getStickerScaleForTextLength(text.length);
-  stickerMesh.scale.set(s.x, s.y, s.y);
+  const scaleX = animType === "bow" ? s.x * 1.25 : s.x;
+  stickerMesh.scale.set(scaleX, s.y, s.y);
 }
 
 // デバッグ用: アニメーション名一覧をコンソールに出力
@@ -1004,14 +1005,11 @@ function updateHandAndInteraction() {
         const now = performance.now();
         const inCooldown = now - lastPinchEndTime < PINCH_COOLDOWN;
 
-        // ピンチ開始（クールダウン中は無視）
+        // ピンチ開始（クールダウン中は無視）。大きさは初期のまま
         if (nowPinching && !isPinching && modelGroup && !inCooldown) {
           isPinching = true;
           grabOffset.set(0, 0, 0); // つかんだ位置にそのまま追従
           lastInteractionTime = now;
-          // 手のサイズに合わせてスケール（親指の深度を使用）
-          const pinchScale = getScaleForHandSize(landmarks, Math.abs(thumbPos.z), camera);
-          modelGroup.scale.set(pinchScale, pinchScale, pinchScale);
           if (pinchIndicator) pinchIndicator.style.display = "block";
           console.log("✊ ピンチ開始");
         }
@@ -1026,18 +1024,13 @@ function updateHandAndInteraction() {
           console.log(`✋ ピンチ解除。${RETURN_TO_CENTER_DELAY / 1000}秒後に中心位置に戻ります`);
         }
 
-        // ピンチ中: 親指先端にモデルの頭頂が来るように追従（頭オフセットを差し引く）
+        // ピンチ中: 親指先端にモデルの頭頂が来るように追従。大きさは初期のまま
         if (isPinching && modelGroup) {
           const headOffsetY = modelHeadTopY > 0 ? modelHeadTopY * modelGroup.scale.y : modelBaseHeight * 0.5 * modelGroup.scale.y;
           modelGroup.position.x = thumbPos.x;
           modelGroup.position.y = thumbPos.y - headOffsetY;
           modelGroup.position.z = thumbPos.z;
           lastInteractionTime = performance.now();
-          // 手のサイズに合わせてスケールを追従（急激な変化を防ぐ）
-          const targetScale = getScaleForHandSize(landmarks, Math.abs(thumbPos.z), camera);
-          const currentScale = modelGroup.scale.x;
-          const nextScale = currentScale + (targetScale - currentScale) * 0.2;
-          modelGroup.scale.set(nextScale, nextScale, nextScale);
         }
       }
     } catch (e) {
