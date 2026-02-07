@@ -1005,28 +1005,38 @@ function updateHandAndInteraction() {
         const now = performance.now();
         const inCooldown = now - lastPinchEndTime < PINCH_COOLDOWN;
 
-        // ピンチ開始（クールダウン中は無視）。大きさは初期のまま
+        // ピンチ開始（クールダウン中は無視）
         if (nowPinching && !isPinching && modelGroup && !inCooldown) {
           isPinching = true;
-          grabOffset.set(0, 0, 0); // つかんだ位置にそのまま追従
+          grabOffset.set(0, 0, 0);
           lastInteractionTime = now;
+          // 距離補正付きスケール（見た目の大きさを一定に保つ）
+          const initialDist = Math.abs(modelInitialPosition.z);
+          const thumbDist = Math.max(0.3, Math.abs(thumbPos.z));
+          const adjustedScale = modelBaseScale / (initialDist / thumbDist);
+          modelGroup.scale.set(adjustedScale, adjustedScale, adjustedScale);
           if (pinchIndicator) pinchIndicator.style.display = "block";
           console.log("✊ ピンチ開始");
         }
-        // ピンチ解除 → 離したら中心位置に戻る（既存の自動復帰ロジックで対応）
+        // ピンチ解除 → スケールはそのまま維持し、中心に戻るlerpで徐々に戻す
         else if (!nowPinching && isPinching) {
           isPinching = false;
           lastInteractionTime = now;
           lastPinchEndTime = now; // クールダウン開始
-          // 視覚フィードバック: 元のサイズに戻す
-          if (modelGroup) modelGroup.scale.set(modelBaseScale, modelBaseScale, modelBaseScale);
+          // スケールは現在の補正値のまま（lerpで徐々にmodelBaseScaleに戻る）
           if (pinchIndicator) pinchIndicator.style.display = "none";
           console.log(`✋ ピンチ解除。${RETURN_TO_CENTER_DELAY / 1000}秒後に中心位置に戻ります`);
         }
 
-        // ピンチ中: 親指先端にモデルの頭頂が来るように追従。大きさは初期のまま
+        // ピンチ中: 親指先端にモデルの頭頂が来るように追従。
+        // 見た目の大きさを一定に保つため、距離に応じてスケールを補正する
         if (isPinching && modelGroup) {
-          const headOffsetY = modelHeadTopY > 0 ? modelHeadTopY * modelGroup.scale.y : modelBaseHeight * 0.5 * modelGroup.scale.y;
+          const initialDist = Math.abs(modelInitialPosition.z);
+          const thumbDist = Math.max(0.3, Math.abs(thumbPos.z));
+          const distRatio = initialDist / thumbDist;
+          const adjustedScale = modelBaseScale / distRatio;
+          modelGroup.scale.set(adjustedScale, adjustedScale, adjustedScale);
+          const headOffsetY = modelHeadTopY > 0 ? modelHeadTopY * adjustedScale : modelBaseHeight * 0.5 * adjustedScale;
           modelGroup.position.x = thumbPos.x;
           modelGroup.position.y = thumbPos.y - headOffsetY;
           modelGroup.position.z = thumbPos.z;
