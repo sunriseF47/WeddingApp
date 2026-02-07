@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="description" content="WebAR名刺 - 名刺をカメラに映すと3Dキャラクターが表示されます">
-    <title>WebAR名刺</title>
+    <meta name="description" content="手を映して親指と人差し指でピンチするとついてきます / Show your hand and pinch to make it follow.">
+    <title>WebAR</title>
     <style>
         * {
             margin: 0;
@@ -43,15 +43,17 @@
 
         #info {
             position: absolute;
-            top: 20px;
-            left: 20px;
+            top: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
             color: #fff;
             background: rgba(0, 0, 0, 0.6);
-            padding: 15px;
-            border-radius: 8px;
+            padding: 12px 16px;
+            border-radius: 0;
             font-size: 14px;
             z-index: 10;
-            max-width: 300px;
+            text-align: center;
         }
 
         #info.hidden {
@@ -60,11 +62,14 @@
 
         #controls {
             position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
+            bottom: 0;
+            left: 0;
+            right: 0;
             display: flex;
-            gap: 15px;
+            justify-content: center;
+            gap: 10px;
+            padding: 6px 12px;
+            padding-bottom: max(6px, env(safe-area-inset-bottom));
             z-index: 10;
         }
 
@@ -75,13 +80,13 @@
         .btn {
             background: rgba(255, 255, 255, 0.9);
             border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
-            font-size: 16px;
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .btn:hover {
@@ -136,10 +141,9 @@
         </div>
 
         <div id="info" class="hidden">
-            <div style="font-weight: 600; margin-bottom: 8px;">📱 WebAR名刺</div>
             <div style="font-size: 12px; line-height: 1.6;">
-                名刺をカメラに映してください<br>
-                ボタンでアニメーションを切り替えられます
+                手を映して親指と人差し指でピンチするとついてきます<br>
+                Show your hand and pinch with thumb & index finger to make it follow.
             </div>
         </div>
 

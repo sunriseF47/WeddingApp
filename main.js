@@ -277,16 +277,15 @@ async function initCameraFixedMode() {
   const infoEl = document.getElementById("info");
   if (infoEl) {
     infoEl.innerHTML =
-      '<div style="font-weight: 600; margin-bottom: 8px;">📱 WebAR名刺</div>' +
-      '<div style="font-size: 12px; line-height: 1.6;">手を映すと検出されます<br>親指と人差し指でピンチしてモデルをつかみ、離すと投げられます</div>';
+      '<div style="font-size: 12px; line-height: 1.6;">手を映して親指と人差し指でピンチするとついてきます<br>Show your hand and pinch with thumb & index finger to make it follow.</div>';
   }
 
-  // ピンチインジケーター（画面中央上部）
+  // ピンチインジケーター（画面中央上部・コンパクト表示）
   pinchIndicator = document.createElement("div");
   pinchIndicator.id = "pinch-indicator";
   pinchIndicator.style.cssText =
-    "position:absolute;top:80px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:20px;" +
-    "background:rgba(0,200,100,0.9);color:#fff;font-weight:bold;font-size:14px;z-index:100;display:none;";
+    "position:absolute;top:56px;left:50%;transform:translateX(-50%);padding:4px 10px;border-radius:12px;" +
+    "background:rgba(0,200,100,0.9);color:#fff;font-weight:600;font-size:11px;z-index:100;display:none;";
   pinchIndicator.textContent = "✊ つかんでいます";
   container.appendChild(pinchIndicator);
 
@@ -1107,15 +1106,23 @@ function updateAnimations() {
 // イベントリスナーの設定
 // ============================================
 function setupEventListeners() {
-  // Wave: 両モデル同じ動き
+  // Wave: 両モデル同じ動き。二人の距離は初期と同じに戻す
   document.getElementById("btnLeftWave").addEventListener("click", () => {
+    if (models.length >= 2) {
+      models[0].position.x = MODEL_CONFIG_FIXED.left.position.x;
+      models[1].position.x = MODEL_CONFIG_FIXED.right.position.x;
+    }
     playAnimation(0, "wave", true);
     playAnimation(1, "wave", true);
     updateStickerText("wave");
   });
 
-  // Bow: 両モデル同じ動き
+  // Bow: 両モデル同じ動き。二人の距離は初期と同じに戻す
   document.getElementById("btnRightBow").addEventListener("click", () => {
+    if (models.length >= 2) {
+      models[0].position.x = MODEL_CONFIG_FIXED.left.position.x;
+      models[1].position.x = MODEL_CONFIG_FIXED.right.position.x;
+    }
     playAnimation(0, "bow", true);
     playAnimation(1, "bow", true);
     updateStickerText("bow");
